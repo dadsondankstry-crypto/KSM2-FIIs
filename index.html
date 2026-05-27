@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f7d69">
+  <meta name="description" content="CRONOS FIIs: ranking, favoritos, controle de colunas e calculadora de investimento em FIIs.">
+  <title>CRONOS FIIs - Dadson Dankstry</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">CRONOS • Dadson Dankstry</p>
+        <h1>Ranking de FIIs</h1>
+        <p class="subtitle">Site/PWA com dados via Cloudflare Worker, ranking, favoritos, controle de colunas e simulação de investimento.</p>
+      </div>
+      <div class="hero-actions">
+        <button id="btnRefresh" class="btn btn-primary">Atualizar dados</button>
+        <button id="btnExportCsv" class="btn">Exportar CSV</button>
+      </div>
+    </section>
+
+    <section class="toolbar card">
+      <div class="ranking-line">
+        <span class="label">Ranking por:</span>
+        <button class="rank-btn" data-sort="patrimonioLiquido" data-desc="true">Valor Patrimonial</button>
+        <button class="rank-btn" data-sort="dividendYield12m" data-desc="true">Dividend Yield</button>
+        <button class="rank-btn" data-sort="notaFinal" data-desc="true">Nota Combinada</button>
+        <button class="rank-btn" data-sort="dyMedio5Anos" data-desc="true">DY Médio 5 anos</button>
+        <button class="rank-btn" data-sort="variacao12m" data-desc="true">Variação 12m</button>
+        <button class="rank-btn" data-sort="variacao24m" data-desc="true">Variação 24m</button>
+        <button class="rank-btn" data-sort="variacao5Anos" data-desc="true">Variação 5 anos</button>
+        <button class="rank-btn" data-sort="ultimoDividendo" data-desc="true">Último Dividendo</button>
+        <button class="rank-btn" data-sort="porcentagemUltDiv" data-desc="true">% Últ. Div.</button>
+        <button class="rank-btn" data-sort="liquidez" data-desc="true">Liquidez</button>
+        <button class="rank-btn" data-sort="pvp" data-desc="false">Menores P/VP</button>
+        <button class="rank-btn" data-sort="simLucro" data-desc="true">Lucro Est.</button>
+        <button class="rank-btn" data-sort="simRentabilidade" data-desc="true">Rentab. Est.</button>
+        <button class="rank-btn" data-sort="simRendaMensal" data-desc="true">Renda Mensal</button>
+        <button class="rank-btn" data-action="favoritos">Mais Queridos</button>
+        <span class="divider"></span>
+        <button id="btnFavoritesOnly" class="rank-btn heart">♡ Meus Favoritos</button>
+        <button id="btnCustomize" class="rank-btn">▦ Customizar</button>
+      </div>
+
+      <div id="sortTrail" class="sort-trail"></div>
+
+      <div class="filter-grid">
+        <label>
+          <span>Buscar fundo</span>
+          <input id="searchInput" type="search" placeholder="Ex.: KNCR11, logística, papel...">
+        </label>
+        <label>
+          <span>Tipo de fundo</span>
+          <select id="typeFilter"><option value="">Todos</option></select>
+        </label>
+        <label>
+          <span>Segmento</span>
+          <select id="segmentFilter"><option value="">Todos</option></select>
+        </label>
+        <label>
+          <span>Adicionar tickers temporários</span>
+          <input id="extraTickers" type="text" placeholder="Ex.: KNIP11, KFOF11, BARI11">
+        </label>
+      </div>
+
+      <div class="mini-actions">
+        <button id="btnClearSort" class="btn btn-small">Limpar ordem</button>
+        <button id="btnUseExtras" class="btn btn-small">Atualizar com tickers extras</button>
+        <span id="statusText" class="status">Carregando...</span>
+      </div>
+
+      <div class="simulator-box">
+        <div class="simulator-head">
+          <div>
+            <strong>Calculadora na tabela</strong>
+            <span>Digite o valor e os meses para ver cotas, dividendos, valorização, lucro e rentabilidade em cada FII.</span>
+          </div>
+          <button id="btnExportSimulation" class="btn btn-small">Exportar simulação CSV</button>
+        </div>
+        <div class="simulator-grid">
+          <label>
+            <span>Valor por FII</span>
+            <input id="calcValor" type="text" inputmode="decimal" value="10000" placeholder="Ex.: 10000">
+          </label>
+          <label>
+            <span>Meses</span>
+            <input id="calcMeses" type="number" min="1" step="1" value="12">
+          </label>
+          <label>
+            <span>Modo de cálculo</span>
+            <select id="calcModo">
+              <option value="dy_variacao">DY 12m + Variação 12m</option>
+              <option value="dy">Somente DY 12m</option>
+              <option value="ultimo">Somente último dividendo</option>
+              <option value="ultimo_variacao">Último dividendo + Variação 12m</option>
+            </select>
+          </label>
+          <label class="check-label">
+            <input id="calcVarProporcional" type="checkbox" checked>
+            <span>Variação proporcional aos meses</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat-card"><span>Total</span><strong id="statTotal">0</strong></div>
+      <div class="stat-card"><span>Com DY</span><strong id="statDy">0</strong></div>
+      <div class="stat-card"><span>Melhor DY</span><strong id="statBestDy">-</strong></div>
+      <div class="stat-card"><span>Melhor Nota</span><strong id="statBestScore">-</strong></div>
+      <div class="stat-card"><span>Maior Lucro Est.</span><strong id="statBestProfit">-</strong></div>
+      <div class="stat-card"><span>Maior Renda/mês</span><strong id="statBestIncome">-</strong></div>
+    </section>
+
+    <section class="table-card card">
+      <div class="table-scroll">
+        <table id="fiisTable">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="app-footer">CRONOS FIIs • Dadson Dankstry • Dados carregados pelo Worker configurado em <code>config.js</code></footer>
+
+    <dialog id="columnsDialog" class="dialog columns-dialog">
+      <form method="dialog">
+        <div class="columns-modal-head">
+          <div>
+            <h2>Customizar colunas</h2>
+            <p>Marque/desmarque para mostrar ou ocultar. Segure e arraste para mudar a ordem.</p>
+            <span id="columnCounter">0 colunas visíveis</span>
+          </div>
+          <button id="btnCloseColumns" class="icon-close" value="close" aria-label="Fechar">×</button>
+        </div>
+        <div class="table-tool-actions modal-actions">
+          <button id="btnShowAllColumns" type="button" class="btn btn-small">Mostrar todas</button>
+          <button id="btnOnlyMainColumns" type="button" class="btn btn-small">Só principais</button>
+          <button id="btnHideSimulationColumns" type="button" class="btn btn-small">Ocultar simulação</button>
+          <button id="btnResetColumns" type="button" class="btn btn-small">Restaurar padrão</button>
+        </div>
+        <div id="columnManager" class="column-manager" aria-label="Controle de colunas da tabela"></div>
+        <div class="dialog-actions">
+          <button class="btn btn-primary" value="close">Salvar e fechar</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

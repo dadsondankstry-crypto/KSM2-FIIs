@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2f7d69"/>
+  <path d="M126 356h260" stroke="#fff" stroke-width="28" stroke-linecap="round"/>
+  <path d="M156 326V210m70 116V158m70 168V248m70 78V120" stroke="#fff" stroke-width="32" stroke-linecap="round"/>
+  <path d="M122 220l70-62 77 64 116-108" fill="none" stroke="#dff7ed" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="428" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="52" fill="#fff">FIIs</text>
+</svg>

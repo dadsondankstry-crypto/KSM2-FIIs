@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cronos-fiis-pwa-v1';
+const CACHE_NAME = 'cronos-fiis-pwa-v2-detalhes';
 const ASSETS = [
   './',
   './index.html',

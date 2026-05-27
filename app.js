@@ -1,5 +1,5 @@
 const API_BASE = (window.CRONOS_CONFIG?.API_BASE || '').replace(/\/$/, '');
-const APP_VERSION = '2026.05.27-cloudflare-pwa';
+const APP_VERSION = '2026.05.27-cloudflare-pwa-detalhes';
 
 const state = {
   rows: [],
@@ -9,6 +9,9 @@ const state = {
   favoritesOnly: false,
   hiddenColumns: new Set(JSON.parse(localStorage.getItem('cronosHiddenColumns') || '[]')),
   columnOrder: [],
+  detailLoading: false,
+  detailLoaded: new Set(),
+  detailErrors: 0,
 };
 
 const calcDefaults = {
@@ -284,6 +287,77 @@ async function fetchJson(url, options = {}) {
   return await res.json();
 }
 
+
+function shouldEnrichRow(row) {
+  if (!row || !row.ticker || state.detailLoaded.has(row.ticker)) return false;
+  return !num(row.cotacaoAtual) || !num(row.ultimoDividendo) || !row.dataCom || !row.dataPagamento;
+}
+
+function mergeDetailRows(detailRows = []) {
+  if (!Array.isArray(detailRows) || !detailRows.length) return 0;
+  const map = new Map(state.rows.map((row, index) => [String(row.ticker || '').toUpperCase(), { row, index }]));
+  let changed = 0;
+  for (const detail of detailRows) {
+    const ticker = String(detail?.ticker || '').toUpperCase();
+    if (!ticker || !map.has(ticker)) continue;
+    const current = map.get(ticker).row;
+    const merged = { ...current };
+    for (const [key, value] of Object.entries(detail)) {
+      if (key === 'ticker') continue;
+      if (value === null || value === undefined || value === '') continue;
+      if (key === 'erro') continue;
+      const currentValue = merged[key];
+      const isNumeric = typeof value === 'number' && Number.isFinite(value);
+      const shouldOverwrite = currentValue === null || currentValue === undefined || currentValue === '' || currentValue === '-' || isNumeric || key.startsWith('fonte') || key === 'dataCom' || key === 'dataPagamento' || key === 'nome' || key === 'tipo' || key === 'segmento';
+      if (shouldOverwrite) merged[key] = value;
+    }
+    state.rows[map.get(ticker).index] = merged;
+    state.detailLoaded.add(ticker);
+    if (detail.erro) state.detailErrors += 1;
+    changed += 1;
+  }
+  return changed;
+}
+
+async function fetchDetailsBatch(tickers, force = false) {
+  if (!API_BASE || !tickers.length) return [];
+  const url = `${API_BASE}/api/details?tickers=${encodeURIComponent(tickers.join(','))}${force ? '&force=1' : ''}`;
+  const data = await fetchJson(url, { cache: force ? 'no-store' : 'default' });
+  return data.rows || [];
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function enrichDetailsInBackground(force = false) {
+  if (!API_BASE || state.detailLoading) return;
+  const candidates = state.rows.filter(row => force || shouldEnrichRow(row)).map(row => row.ticker);
+  if (!candidates.length) return;
+  state.detailLoading = true;
+  state.detailErrors = 0;
+  const batchSize = 8;
+  let loaded = 0;
+  try {
+    for (let i = 0; i < candidates.length; i += batchSize) {
+      const batch = candidates.slice(i, i + batchSize);
+      setStatus(`Completando detalhes do Investidor10: ${Math.min(i + batch.length, candidates.length)}/${candidates.length}...`);
+      try {
+        const details = await fetchDetailsBatch(batch, force);
+        const changed = mergeDetailRows(details);
+        loaded += changed;
+        if (changed) applyAll();
+      } catch (err) {
+        state.detailErrors += batch.length;
+      }
+      await sleep(450);
+    }
+    setStatus(`${state.rows.length} fundos carregados • detalhes completos ${loaded}/${candidates.length}${state.detailErrors ? ` • falhas ${state.detailErrors}` : ''}`);
+  } finally {
+    state.detailLoading = false;
+  }
+}
+
 async function loadLocalFallback() {
   const data = await fetchJson('dados_fiis.json?local=' + Date.now(), { cache: 'no-store' });
   return { ...data, fallbackLocal: true };
@@ -315,6 +389,7 @@ async function loadData(refresh = false, extras = '') {
     const yahooText = data.sources?.yahooAtivo ? `Yahoo ${data.sources?.yahooCount || 0}` : 'Yahoo indisponível';
     const localText = data.fallbackLocal ? ' • fallback local' : '';
     setStatus(`${state.rows.length} fundos carregados • atualizado em ${updated} • ${invText} • ${yahooText}${localText}`);
+    if (API_BASE) setTimeout(() => enrichDetailsInBackground(false), 400);
   } catch (e) {
     try {
       const data = await loadLocalFallback();
